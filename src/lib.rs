@@ -1,10 +1,15 @@
 use std::vec;
 
-use windows_sys::Win32::Foundation::{HWND, LPARAM};
-use windows_sys::Win32::System::Console::GetConsoleWindow;
-use windows_sys::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowTextLengthW, GetWindowTextW, HWND_TOP, IsWindowVisible, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_SHOWWINDOW, ShowWindow};
-use windows_sys::Win32::Graphics::Gdi::{GetMonitorInfoW, HDC, HMONITOR, MONITOR_DEFAULTTONEAREST, MONITORINFO};
 use windows_sys::core::BOOL;
+use windows_sys::Win32::Foundation::{HWND, LPARAM};
+use windows_sys::Win32::Graphics::Gdi::{
+    GetMonitorInfoW, HDC, HMONITOR, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+};
+use windows_sys::Win32::System::Console::GetConsoleWindow;
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    EnumWindows, GetWindowTextLengthW, GetWindowTextW, IsWindowVisible, ShowWindow, HWND_TOP,
+    SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_SHOWWINDOW,
+};
 
 #[derive(Clone)]
 pub struct WindowInfo {
@@ -28,7 +33,7 @@ pub struct MonitorInfo {
     pub id: u32,
 }
 
-pub struct MonitorWindowCollection{
+pub struct MonitorWindowCollection {
     pub monitor: MonitorInfo,
     pub windows: Vec<WindowInfo>,
 }
@@ -41,7 +46,10 @@ impl WindowInfo {
 
 impl ToString for MonitorBounds {
     fn to_string(&self) -> String {
-        format!("Left: {}, Top: {}, Right: {}, Bottom: {}", self.left, self.top, self.right, self.bottom)
+        format!(
+            "Left: {}, Top: {}, Right: {}, Bottom: {}",
+            self.left, self.top, self.right, self.bottom
+        )
     }
 }
 
@@ -67,39 +75,49 @@ pub fn enumerate_windows(visible_only: bool) -> Vec<WindowInfo> {
         return windows;
     }
 
-    windows.into_iter()
+    windows
+        .into_iter()
         .filter(|window: &WindowInfo| window.visible && !window.title.is_empty())
         .collect()
 }
 
-pub fn map_windows_to_monitors(windows: &Vec<WindowInfo>, monitors: &Vec<MonitorInfo>)-> Vec<MonitorWindowCollection> {
-
-    let mut montor_window_collections = monitors.iter().map(|monitor| {
-        MonitorWindowCollection {
+pub fn map_windows_to_monitors(
+    windows: &Vec<WindowInfo>,
+    monitors: &Vec<MonitorInfo>,
+) -> Vec<MonitorWindowCollection> {
+    let mut montor_window_collections = monitors
+        .iter()
+        .map(|monitor| MonitorWindowCollection {
             monitor: *monitor,
             windows: Vec::new(),
-        }
-    }).collect::<Vec<_>>();
-
+        })
+        .collect::<Vec<_>>();
 
     for window in windows {
-        let monitor_hwnd= unsafe { windows_sys::Win32::Graphics::Gdi::MonitorFromWindow(window.handle, MONITOR_DEFAULTTONEAREST) };
+        let monitor_hwnd = unsafe {
+            windows_sys::Win32::Graphics::Gdi::MonitorFromWindow(
+                window.handle,
+                MONITOR_DEFAULTTONEAREST,
+            )
+        };
 
         // could do a dictionary lookup here, but how many monitors do you have? 1-3? I think this is fine for now.
-        let monitor_id = monitors.iter().position(|monitor| monitor.handle == monitor_hwnd);
+        let monitor_id = monitors
+            .iter()
+            .position(|monitor| monitor.handle == monitor_hwnd);
 
-        montor_window_collections[monitor_id.unwrap_or(0) as usize].windows.push(window.clone());
+        montor_window_collections[monitor_id.unwrap_or(0) as usize]
+            .windows
+            .push(window.clone());
     }
 
     montor_window_collections
 }
 
-unsafe extern "system" fn enumerate_windows_callback(handle: HWND, param: LPARAM) -> BOOL{
-    
+unsafe extern "system" fn enumerate_windows_callback(handle: HWND, param: LPARAM) -> BOOL {
     let visible = unsafe { IsWindowVisible(handle) } != 0;
     let str_len = unsafe { GetWindowTextLengthW(handle) };
     let buf = vec![0u16; (str_len + 1) as usize];
-
 
     let title = unsafe {
         GetWindowTextW(handle, buf.as_ptr() as *mut u16, str_len + 1);
@@ -122,7 +140,12 @@ pub fn enumerate_monitors() -> Vec<MonitorInfo> {
     let mut monitors = Vec::new();
     let param = &mut monitors as *mut _ as LPARAM;
     unsafe {
-        windows_sys::Win32::Graphics::Gdi::EnumDisplayMonitors(0 as HMONITOR, std::ptr::null(), Some(enumerate_monitor_callback), param);
+        windows_sys::Win32::Graphics::Gdi::EnumDisplayMonitors(
+            0 as HMONITOR,
+            std::ptr::null(),
+            Some(enumerate_monitor_callback),
+            param,
+        );
     }
     monitors
 }
@@ -131,7 +154,7 @@ unsafe extern "system" fn enumerate_monitor_callback(
     monitor: HMONITOR,
     hdc: HDC,
     lprc: *mut windows_sys::Win32::Foundation::RECT,
-    param: LPARAM
+    param: LPARAM,
 ) -> BOOL {
     let mut info: MONITORINFO = std::mem::zeroed();
     info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
@@ -161,7 +184,10 @@ pub fn move_window_to_monitor(window: &WindowInfo, monitor: &MonitorInfo) {
 
     // show
     let res = unsafe {
-        ShowWindow(window.handle, windows_sys::Win32::UI::WindowsAndMessaging::SW_RESTORE)
+        ShowWindow(
+            window.handle,
+            windows_sys::Win32::UI::WindowsAndMessaging::SW_RESTORE,
+        )
     };
 
     if res == 0 {
@@ -178,7 +204,7 @@ pub fn move_window_to_monitor(window: &WindowInfo, monitor: &MonitorInfo) {
             bounds.top,
             bounds.right - bounds.left,
             bounds.bottom - bounds.top,
-            flags
+            flags,
         )
     };
 
@@ -188,19 +214,19 @@ pub fn move_window_to_monitor(window: &WindowInfo, monitor: &MonitorInfo) {
     }
 
     let res = unsafe {
-        ShowWindow(window.handle, windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOW)
+        ShowWindow(
+            window.handle,
+            windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOW,
+        )
     };
 
     if res == 0 {
         let error = unsafe { windows_sys::Win32::Foundation::GetLastError() };
         println!("Failed to show window: {:?}", error);
     }
-
-
-
 }
 
-pub fn get_current_monitor_window_collections(collections: &Vec<MonitorWindowCollection>) -> HWND{
+pub fn get_current_monitor_window_collections(collections: &Vec<MonitorWindowCollection>) -> HWND {
     let hwnd = unsafe { GetConsoleWindow() };
     hwnd
 }
