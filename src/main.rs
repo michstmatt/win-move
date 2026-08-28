@@ -4,6 +4,7 @@ use std::println;
 enum Options {
     Print,
     Move(String, u32),
+    Help
 }
 
 fn print_windows(monitor_window_collections: Vec<lib::MonitorWindowCollection>) {
@@ -114,8 +115,7 @@ fn main() {
         };
         Options::Move(window_title, monitor_id)
     } else {
-        print_help();
-        std::process::exit(1);
+        Options::Help
     };
 
     let mut windows = lib::enumerate_windows(false);
@@ -126,6 +126,7 @@ fn main() {
         Options::Print => print_windows(monitor_window_collections),
         Options::Move(window_title, monitor_id) => {
             move_window(monitor_window_collections, &window_title, monitor_id)
-        }
+        },
+        Options::Help => print_help()
     }
 }
