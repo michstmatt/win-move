@@ -86,6 +86,7 @@ fn move_window(
         window_title, monitor_id
     );
 }
+
 fn print_help() {
     println!("Usage:");
     println!("  > win-move.exe");
